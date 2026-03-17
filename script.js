@@ -1218,7 +1218,25 @@ const TRANSLATIONS = {
         'bulletList': 'Bullet List',
         'numberedList': 'Numbered List',
         'insertLink': 'Insert Link',
-        'insertImage': 'Insert Image'
+        'insertImage': 'Insert Image',
+
+        // API Configuration
+        'apiConfig': 'API Configuration',
+        'enableCloudflareAPI': 'Enable Cloudflare KV API',
+        'apiConfigDescription': 'Enable to store blogs in Cloudflare KV for cross-device access. Disable to use browser localStorage only.',
+        'apiEndpoint': 'API Endpoint',
+        'apiEndpointDescription': 'Relative path to your API endpoint. Usually "/api/blogs" if deployed on same domain.',
+        'apiKey': 'API Key',
+        'apiKeyDescription': 'Secure API key from Cloudflare Pages environment variables.',
+        'useLocalStorageFallback': 'Use localStorage fallback',
+        'fallbackDescription': 'When enabled, blogs will be cached in localStorage for offline access and faster loading.',
+        'apiStatus': 'API Status',
+        'loadingStatus': 'Loading status...',
+        'testConnection': 'Test Connection',
+        'saveApiConfig': 'Save API Configuration',
+        'dataMigration': 'Data Migration',
+        'migrationDescription': 'You have blogs stored in localStorage. Would you like to migrate them to Cloudflare KV?',
+        'migrateToKV': 'Migrate to Cloudflare KV'
     },
     zh: {
         // Header
@@ -1266,7 +1284,25 @@ const TRANSLATIONS = {
         'bulletList': '项目符号列表',
         'numberedList': '编号列表',
         'insertLink': '插入链接',
-        'insertImage': '插入图片'
+        'insertImage': '插入图片',
+
+        // API Configuration
+        'apiConfig': 'API 配置',
+        'enableCloudflareAPI': '启用 Cloudflare KV API',
+        'apiConfigDescription': '启用后将博客存储在 Cloudflare KV 中实现跨设备访问。禁用则仅使用浏览器本地存储。',
+        'apiEndpoint': 'API 端点',
+        'apiEndpointDescription': 'API 端点的相对路径。如果部署在同一域名下，通常为 "/api/blogs"。',
+        'apiKey': 'API 密钥',
+        'apiKeyDescription': '来自 Cloudflare Pages 环境变量的安全 API 密钥。',
+        'useLocalStorageFallback': '使用 localStorage 回退',
+        'fallbackDescription': '启用后，博客将缓存在 localStorage 中以供离线访问和更快加载。',
+        'apiStatus': 'API 状态',
+        'loadingStatus': '正在加载状态...',
+        'testConnection': '测试连接',
+        'saveApiConfig': '保存 API 配置',
+        'dataMigration': '数据迁移',
+        'migrationDescription': '您在 localStorage 中存储了博客。是否要迁移到 Cloudflare KV？',
+        'migrateToKV': '迁移到 Cloudflare KV'
     }
 };
 
@@ -1331,8 +1367,332 @@ function translatePage() {
         : '管理仪表板 - 1³ Machine';
 }
 
+// ===========================================
+// API Configuration Management
+// ===========================================
+
+// Load API configuration into UI
+function loadApiConfigUI() {
+    const config = loadBlogApiConfig();
+
+    // Update checkbox
+    const apiEnabledCheckbox = document.getElementById('apiEnabled');
+    if (apiEnabledCheckbox) {
+        apiEnabledCheckbox.checked = config.enabled;
+
+        // Show/hide configuration details
+        const apiConfigDetails = document.getElementById('apiConfigDetails');
+        if (apiConfigDetails) {
+            apiConfigDetails.style.display = config.enabled ? 'block' : 'none';
+        }
+    }
+
+    // Update form fields
+    const apiEndpointInput = document.getElementById('apiEndpoint');
+    if (apiEndpointInput) {
+        apiEndpointInput.value = config.endpoint || '/api/blogs';
+    }
+
+    const apiKeyInput = document.getElementById('apiKey');
+    if (apiKeyInput) {
+        apiKeyInput.value = config.apiKey || '';
+    }
+
+    const fallbackCheckbox = document.getElementById('useLocalStorageFallback');
+    if (fallbackCheckbox) {
+        fallbackCheckbox.checked = config.useLocalStorageFallback !== false; // Default to true
+    }
+
+    // Update API status
+    updateApiStatus();
+
+    // Show/hide migration section if there are local blogs and API is disabled
+    const localBlogs = JSON.parse(localStorage.getItem('blogs')) || [];
+    const migrationSection = document.getElementById('migrationSection');
+    if (migrationSection && localBlogs.length > 0 && !config.enabled) {
+        migrationSection.style.display = 'block';
+    } else if (migrationSection) {
+        migrationSection.style.display = 'none';
+    }
+}
+
+// Update API connection status
+async function updateApiStatus() {
+    const statusElement = document.getElementById('apiStatus');
+    if (!statusElement) return;
+
+    const config = loadBlogApiConfig();
+
+    if (!config.enabled) {
+        statusElement.innerHTML = '<span style="color: #666;">' + (currentLanguage === 'en' ? 'API is disabled' : 'API 已禁用') + '</span>';
+        return;
+    }
+
+    statusElement.innerHTML = '<span style="color: #0088cc;">' + (currentLanguage === 'en' ? 'Testing connection...' : '正在测试连接...') + '</span>';
+
+    try {
+        const response = await fetch(config.endpoint, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            statusElement.innerHTML = '<span style="color: #28a745;">' + (currentLanguage === 'en' ? '✓ API connected successfully' : '✓ API 连接成功') + '</span>';
+        } else {
+            statusElement.innerHTML = '<span style="color: #e60000;">' + (currentLanguage === 'en' ? '✗ API error: ' + response.status : '✗ API 错误: ' + response.status) + '</span>';
+        }
+    } catch (error) {
+        statusElement.innerHTML = '<span style="color: #e60000;">' + (currentLanguage === 'en' ? '✗ Connection failed: ' + error.message : '✗ 连接失败: ' + error.message) + '</span>';
+    }
+}
+
+// Save API configuration
+function saveApiConfig() {
+    const config = {
+        enabled: document.getElementById('apiEnabled').checked,
+        endpoint: document.getElementById('apiEndpoint').value.trim() || '/api/blogs',
+        apiKey: document.getElementById('apiKey').value.trim(),
+        useLocalStorageFallback: document.getElementById('useLocalStorageFallback').checked
+    };
+
+    // Validate endpoint
+    if (!config.endpoint.startsWith('/')) {
+        config.endpoint = '/' + config.endpoint;
+    }
+
+    saveBlogApiConfig(config);
+
+    // Update UI
+    loadApiConfigUI();
+
+    alert(currentLanguage === 'en'
+        ? 'API configuration saved successfully!'
+        : 'API 配置保存成功！');
+}
+
+// Test API connection
+async function testApiConnection() {
+    const config = loadBlogApiConfig();
+
+    if (!config.enabled) {
+        alert(currentLanguage === 'en'
+            ? 'Please enable API first'
+            : '请先启用 API');
+        return;
+    }
+
+    if (!config.apiKey) {
+        alert(currentLanguage === 'en'
+            ? 'Please enter your API key first'
+            : '请先输入您的 API 密钥');
+        return;
+    }
+
+    const testBtn = document.getElementById('testApiConnection');
+    const originalText = testBtn.textContent;
+    testBtn.textContent = currentLanguage === 'en' ? 'Testing...' : '测试中...';
+    testBtn.disabled = true;
+
+    try {
+        // Test with a simple GET request
+        const response = await fetch(config.endpoint, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            alert(currentLanguage === 'en'
+                ? '✓ API connection successful!'
+                : '✓ API 连接成功！');
+        } else {
+            alert(currentLanguage === 'en'
+                ? '✗ API error: ' + response.status + ' ' + response.statusText
+                : '✗ API 错误: ' + response.status + ' ' + response.statusText);
+        }
+    } catch (error) {
+        alert(currentLanguage === 'en'
+            ? '✗ Connection failed: ' + error.message
+            : '✗ 连接失败: ' + error.message);
+    } finally {
+        testBtn.textContent = originalText;
+        testBtn.disabled = false;
+        updateApiStatus();
+    }
+}
+
+// Migrate local blogs to Cloudflare KV
+async function migrateToKV() {
+    const config = loadBlogApiConfig();
+
+    if (!config.enabled) {
+        alert(currentLanguage === 'en'
+            ? 'Please enable API first before migrating'
+            : '迁移前请先启用 API');
+        return;
+    }
+
+    if (!config.apiKey) {
+        alert(currentLanguage === 'en'
+            ? 'Please enter your API key first'
+            : '请先输入您的 API 密钥');
+        return;
+    }
+
+    const localBlogs = JSON.parse(localStorage.getItem('blogs')) || [];
+
+    if (localBlogs.length === 0) {
+        alert(currentLanguage === 'en'
+            ? 'No blogs found in localStorage to migrate'
+            : 'localStorage 中没有找到要迁移的博客');
+        return;
+    }
+
+    const migrateBtn = document.getElementById('migrateToKV');
+    const originalText = migrateBtn.textContent;
+    migrateBtn.textContent = currentLanguage === 'en' ? 'Migrating...' : '迁移中...';
+    migrateBtn.disabled = true;
+
+    const statusElement = document.getElementById('migrationStatus');
+    statusElement.style.display = 'block';
+    statusElement.innerHTML = '<div style="color: #0088cc;">' +
+        (currentLanguage === 'en' ? 'Starting migration...' : '开始迁移...') + '</div>';
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < localBlogs.length; i++) {
+        const blog = localBlogs[i];
+
+        try {
+            const response = await fetch(config.endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-API-Key': config.apiKey,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify(blog)
+            });
+
+            if (response.ok) {
+                successCount++;
+                statusElement.innerHTML += '<div style="color: #28a745; margin-top: 5px;">' +
+                    (currentLanguage === 'en'
+                        ? `✓ "${blog.title}" migrated successfully`
+                        : `✓ "${blog.title}" 迁移成功`) +
+                    '</div>';
+            } else {
+                errorCount++;
+                const errorText = await response.text();
+                statusElement.innerHTML += '<div style="color: #e60000; margin-top: 5px;">' +
+                    (currentLanguage === 'en'
+                        ? `✗ "${blog.title}" failed: ${errorText}`
+                        : `✗ "${blog.title}" 失败: ${errorText}`) +
+                    '</div>';
+            }
+        } catch (error) {
+            errorCount++;
+            statusElement.innerHTML += '<div style="color: #e60000; margin-top: 5px;">' +
+                (currentLanguage === 'en'
+                    ? `✗ "${blog.title}" error: ${error.message}`
+                    : `✗ "${blog.title}" 错误: ${error.message}`) +
+                '</div>';
+        }
+
+        // Scroll to bottom
+        statusElement.scrollTop = statusElement.scrollHeight;
+    }
+
+    statusElement.innerHTML += '<div style="margin-top: 10px; font-weight: bold; color: #333;">' +
+        (currentLanguage === 'en'
+            ? `Migration completed: ${successCount} successful, ${errorCount} failed`
+            : `迁移完成: ${successCount} 个成功, ${errorCount} 个失败`) +
+        '</div>';
+
+    if (errorCount === 0) {
+        // Clear local blogs after successful migration
+        localStorage.removeItem('blogs');
+        statusElement.innerHTML += '<div style="color: #28a745; margin-top: 5px;">' +
+            (currentLanguage === 'en'
+                ? '✓ localStorage data cleared'
+                : '✓ localStorage 数据已清除') +
+            '</div>';
+    }
+
+    migrateBtn.textContent = originalText;
+    migrateBtn.disabled = false;
+
+    // Reload blog list
+    if (typeof loadBlogs === 'function') {
+        loadBlogs();
+    }
+
+    // Hide migration section
+    const migrationSection = document.getElementById('migrationSection');
+    if (migrationSection) {
+        migrationSection.style.display = 'none';
+    }
+}
+
+// Initialize API configuration UI
+function initApiConfig() {
+    const apiEnabledCheckbox = document.getElementById('apiEnabled');
+    if (!apiEnabledCheckbox) return; // Not on admin page
+
+    // Load current config
+    loadApiConfigUI();
+
+    // Toggle config details when checkbox changes
+    apiEnabledCheckbox.addEventListener('change', function() {
+        const apiConfigDetails = document.getElementById('apiConfigDetails');
+        if (apiConfigDetails) {
+            apiConfigDetails.style.display = this.checked ? 'block' : 'none';
+        }
+
+        // Update migration section visibility
+        const localBlogs = JSON.parse(localStorage.getItem('blogs')) || [];
+        const migrationSection = document.getElementById('migrationSection');
+        if (migrationSection && localBlogs.length > 0 && !this.checked) {
+            migrationSection.style.display = 'block';
+        } else if (migrationSection) {
+            migrationSection.style.display = 'none';
+        }
+    });
+
+    // Save button
+    const saveBtn = document.getElementById('saveApiConfig');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveApiConfig);
+    }
+
+    // Test connection button
+    const testBtn = document.getElementById('testApiConnection');
+    if (testBtn) {
+        testBtn.addEventListener('click', testApiConnection);
+    }
+
+    // Migrate button
+    const migrateBtn = document.getElementById('migrateToKV');
+    if (migrateBtn) {
+        migrateBtn.addEventListener('click', migrateToKV);
+    }
+}
+
+// ===========================================
+// Page Initialization
+// ===========================================
+
 // Initialize language on page load
 document.addEventListener('DOMContentLoaded', function() {
     updateLanguageDisplay();
     translatePage();
+
+    // Initialize API configuration if on admin page
+    if (document.getElementById('adminDashboard')) {
+        initApiConfig();
+    }
 });

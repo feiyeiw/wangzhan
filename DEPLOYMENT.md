@@ -74,14 +74,24 @@ localStorage.setItem('blogApiConfig', JSON.stringify({
 location.reload();
 ```
 
-### 方法 B：通过管理员面板（推荐）
+### 方法 B：通过管理员面板配置界面（推荐 - 现已实现）
 
-在管理员面板添加配置界面：
+现在您可以通过管理员面板的图形界面配置 Cloudflare KV API：
 
-1. 在 `admin.html` 中添加配置表单
-2. 在 `script.js` 中实现配置保存功能
+1. 打开网站的管理员页面 (`/admin.html`)
+2. 登录后，向下滚动到 **API Configuration** 部分
+3. 配置选项：
+   - **Enable Cloudflare KV API**: 启用/禁用 API 模式
+   - **API Endpoint**: API 端点路径（默认 `/api/blogs`）
+   - **API Key**: 您的 Cloudflare Pages 环境变量中的 API 密钥
+   - **Use localStorage fallback**: 启用本地存储回退（推荐）
+4. 点击 **Test Connection** 测试 API 连接
+5. 点击 **Save API Configuration** 保存配置
 
-（后续版本将添加此功能）
+**数据迁移功能**：
+- 如果您有现有的本地博客，系统会自动检测并显示迁移选项
+- 点击 **Migrate to Cloudflare KV** 将本地博客迁移到云端
+- 迁移过程会显示每个博客的迁移状态
 
 ## 📊 数据迁移
 
@@ -210,11 +220,14 @@ wrangler kv:key list --namespace-id=您的命名空间ID --json > kv-backup.json
 
 ## 🔮 未来改进
 
-1. **管理员配置界面** - 在管理员面板中配置 API 设置
+1. **✓ 管理员配置界面** - 已在管理员面板中实现 API 配置界面
 2. **数据版本控制** - 添加博客版本历史
 3. **图片存储** - 将博客图片也存储到 KV 或 R2
 4. **评论系统** - 基于 KV 的简单评论功能
 5. **缓存优化** - 更智能的缓存策略
+6. **批量操作** - 批量导入/导出博客数据
+7. **搜索功能** - 基于 KV 的全文搜索
+8. **访问统计** - 博客阅读次数统计
 
 ## 🆘 获取帮助
 
